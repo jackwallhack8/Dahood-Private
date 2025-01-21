@@ -1,0 +1,333 @@
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
+local Window = Fluent:CreateWindow({
+    Title = "Dahood Private " .. Fluent.Version,
+    SubTitle = "by ! Sharpie",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = true,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+-- Tabs
+local Tabs = {
+    Aimbot = Window:AddTab({ Title = "Aimbot", Icon = "" }),  -- Aimbot tab
+    Player = Window:AddTab({ Title = "Player", Icon = "" }),  -- Player tab
+    Teleport = Window:AddTab({ Title = "Teleport", Icon = "" }),  -- Teleport tab
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })  -- Settings tab
+}
+
+local Options = Fluent.Options
+
+-- Aimbot Tab
+local aimbotEnabled = false  -- This will track the toggle state
+
+Tabs.Aimbot:AddToggle("AimbotToggle", {
+    Title = "Enable Aimbot (Hold E)",
+    Default = false,
+    Callback = function(Value)
+        aimbotEnabled = Value  -- Update the aimbot state when the button is toggled
+    end
+})
+
+-- Aimbot logic that only activates while holding down the "E" key and is enabled
+local holdingE = false
+local smoothingFactor = 1.5  -- Control the smoothness (0.1 means slower, 0.9 means quicker)
+
+local function aimAtClosestToScreenCenter()
+    local closestPlayer = nil
+    local closestDistance = math.huge  -- Set to maximum value
+
+    -- Get the camera and current player
+    local camera = workspace.CurrentCamera
+    local player = game.Players.LocalPlayer
+    local viewportCenter = camera.ViewportSize / 2  -- Get the center of the screen
+
+    -- Loop through all players to find the one closest to the center of the screen
+    for _, otherPlayer in ipairs(game.Players:GetPlayers()) do
+        if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("Head") then
+            local head = otherPlayer.Character.Head
+            local screenPos, onScreen = camera:WorldToViewportPoint(head.Position)
+
+            -- Only target players that are visible on the screen
+            if onScreen then
+                local distanceToCenter = (Vector2.new(screenPos.X, screenPos.Y) - viewportCenter).Magnitude
+                -- Find the closest player to the center of the screen
+                if distanceToCenter < closestDistance then
+                    closestDistance = distanceToCenter
+                    closestPlayer = otherPlayer
+                end
+            end
+        end
+    end
+
+    -- If a closest player is found, aim at their head with smoother transition
+    if closestPlayer then
+        local targetHead = closestPlayer.Character.Head
+        local targetPosition = targetHead.Position
+
+        -- Apply smooth lerp (linear interpolation) between current camera position and target head position
+        local newCameraCFrame = camera.CFrame:Lerp(CFrame.new(camera.CFrame.Position, targetPosition), smoothingFactor)
+        
+        -- Update the camera's CFrame gradually
+        camera.CFrame = newCameraCFrame
+    end
+end
+
+-- Listen for the E key to be held down
+local UserInputService = game:GetService("UserInputService")
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.E then
+        holdingE = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.E then
+        holdingE = false
+    end
+end)
+
+-- Run the aimbot logic while holding E and aimbot is enabled
+game:GetService("RunService").Heartbeat:Connect(function()
+    if aimbotEnabled and holdingE then
+        aimAtClosestToScreenCenter()
+    end
+end)
+
+-- Player Tab: CFrame Movement and Speed
+local _0xA6B9 = false
+local _0xG = 16  -- Default speed
+local _0xA1B2 = game.Players.LocalPlayer
+local _0xD4E2 = {}
+local _0xA9B0 = {W = Vector3.new(0, 0, -1), A = Vector3.new(-1, 0, 0), S = Vector3.new(0, 0, 1), D = Vector3.new(1, 0, 0)}
+local _0xC5D6 = nil  -- Will hold the reference to HumanoidRootPart
+
+local function SetupCharacter()
+    -- Ensure we have a valid character and HumanoidRootPart reference
+    local _0xB3C4 = _0xA1B2.Character or _0xA1B2.CharacterAdded:Wait()
+    _0xC5D6 = _0xB3C4:WaitForChild("HumanoidRootPart")
+end
+
+-- Set up character when it spawns or respawns
+_0xA1B2.CharacterAdded:Connect(function()
+    SetupCharacter()
+end)
+
+-- Initial setup for the current character if it's already loaded
+if _0xA1B2.Character then
+    SetupCharacter()
+end
+
+-- Toggle CFrame movement
+local Toggle = Tabs.Player:AddToggle("ToggleCFrame", {
+    Title = "Toggle CFrame",
+    Default = false
+})
+
+Toggle:OnChanged(function()
+    _0xA6B9 = Toggle.Value
+end)
+
+-- Slider for speed
+local Slider = Tabs.Player:AddSlider("Slider", {
+    Title = "Speed",
+    Description = "Adjust the movement speed.",
+    Default = 16,
+    Min = 16,
+    Max = 300,
+    Rounding = 1,
+    Callback = function(Value)
+        _0xG = Value
+    end
+})
+
+Slider:SetValue(_0xG)
+
+-- Keybinding to move character
+local _0xE8F0 = game:GetService("UserInputService")
+local _0xF2G1 = game:GetService("RunService")
+
+_0xE8F0.InputBegan:Connect(function(_0xB9A4, _0xF1C8)
+    if _0xF1C8 then return end
+    local _0xC8D0 = _0xB9A4.KeyCode.Name
+    if _0xA9B0[_0xC8D0] then
+        _0xD4E2[_0xC8D0] = true
+    end
+end)
+
+_0xE8F0.InputEnded:Connect(function(_0xB9A4)
+    local _0xC8D0 = _0xB9A4.KeyCode.Name
+    if _0xA9B0[_0xC8D0] then
+        _0xD4E2[_0xC8D0] = nil
+    end
+end)
+
+_0xF2G1.RenderStepped:Connect(function(_0xE2F9)
+    if _0xA6B9 and _0xC5D6 and next(_0xD4E2) then
+        local _0xC0D8 = workspace.CurrentCamera
+        local _0xA1C3 = Vector3.zero
+        for _0xB0C6, _ in pairs(_0xD4E2) do
+            local _0xC6A2 = _0xA9B0[_0xB0C6]
+            local _0xA5E1 = _0xC0D8.CFrame:VectorToWorldSpace(_0xC6A2)
+            _0xA1C3 = _0xA1C3 + Vector3.new(_0xA5E1.X, 0, _0xA5E1.Z)
+        end
+
+        if _0xA1C3.Magnitude > 0 then
+            _0xA1C3 = _0xA1C3.Unit * _0xG * _0xE2F9
+            _0xC5D6.CFrame = _0xC5D6.CFrame + _0xA1C3
+        end
+    end
+end)
+
+-- Player Tab: Toggle for noclip
+local noclipEnabled = false
+local noclipToggle = Tabs.Player:AddToggle("ToggleNoclip", {
+    Title = "Toggle Noclip",
+    Default = false,
+    Callback = function(Value)
+        noclipEnabled = Value
+    end
+})
+
+-- Noclip logic
+game:GetService("RunService").Stepped:Connect(function()
+    if noclipEnabled then
+        local character = game.Players.LocalPlayer.Character
+        if character then
+            for _, part in ipairs(character:GetDescendants()) do
+                if part:IsA("BasePart") and part.CanCollide then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end
+end)
+
+-- Ensure noclip toggle affects gameplay
+noclipToggle:OnChanged(function()
+    noclipEnabled = noclipToggle.Value
+end)
+
+-- Teleport Tab: Buttons for Gun Store, Bank, Flamethrower Gun, and Military Base
+Tabs.Teleport:AddButton({
+    Title = "Gun Store",
+    Description = "Teleport to the Gun Store location.",
+    Callback = function()
+        local player = game.Players.LocalPlayer
+        local humanoidRootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if humanoidRootPart then
+            -- Gun store coordinates
+            humanoidRootPart.CFrame = CFrame.new(-584.204833984375, 8.411100387573242, -747.04052734375)
+            Fluent:Notify({
+                Title = "Teleport Success",
+                Content = "Teleported to the Gun Store.",
+                Duration = 5
+            })
+        else
+            Fluent:Notify({
+                Title = "Teleport Error",
+                Content = "Could not find your HumanoidRootPart.",
+                Duration = 5
+            })
+        end
+    end
+})
+
+Tabs.Teleport:AddButton({
+    Title = "Bank",
+    Description = "Teleport to the Bank location.",
+    Callback = function()
+        local player = game.Players.LocalPlayer
+        local humanoidRootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if humanoidRootPart then
+            -- Bank coordinates
+            humanoidRootPart.CFrame = CFrame.new(-444.57098388671875, 23.094741821289062, -283.52471923828125)
+            Fluent:Notify({
+                Title = "Teleport Success",
+                Content = "Teleported to the Bank.",
+                Duration = 5
+            })
+        else
+            Fluent:Notify({
+                Title = "Teleport Error",
+                Content = "Could not find your HumanoidRootPart.",
+                Duration = 5
+            })
+        end
+    end
+})
+
+Tabs.Teleport:AddButton({
+    Title = "Flamethrower Gun",
+    Description = "Teleport to the Flamethrower Gun location.",
+    Callback = function()
+        local player = game.Players.LocalPlayer
+        local humanoidRootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if humanoidRootPart then
+            -- Flamethrower gun coordinates
+            humanoidRootPart.CFrame = CFrame.new(-156.74932861328125, 53.906925201416016, -96.58672332763672)
+            Fluent:Notify({
+                Title = "Teleport Success",
+                Content = "Teleported to the Flamethrower Gun.",
+                Duration = 5
+            })
+        else
+            Fluent:Notify({
+                Title = "Teleport Error",
+                Content = "Could not find your HumanoidRootPart.",
+                Duration = 5
+            })
+        end
+    end
+})
+
+Tabs.Teleport:AddButton({
+    Title = "Military Base",
+    Description = "Teleport to the Military Base location.",
+    Callback = function()
+        local player = game.Players.LocalPlayer
+        local humanoidRootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if humanoidRootPart then
+            -- Military Base coordinates
+            humanoidRootPart.CFrame = CFrame.new(10.83033561706543, 25.351318359375, -872.00341796875)
+            Fluent:Notify({
+                Title = "Teleport Success",
+                Content = "Teleported to the Military Base.",
+                Duration = 5
+            })
+        else
+            Fluent:Notify({
+                Title = "Teleport Error",
+                Content = "Could not find your HumanoidRootPart.",
+                Duration = 5
+            })
+        end
+    end
+})
+
+-- SaveManager and InterfaceManager Setup
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({})
+InterfaceManager:SetFolder("FluentScriptHub")
+SaveManager:SetFolder("FluentScriptHub/specific-game")
+
+InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+SaveManager:BuildConfigSection(Tabs.Settings)
+
+Window:SelectTab(1)
+SaveManager:LoadAutoloadConfig()
+
+-- Notify when the script is loaded
+Fluent:Notify({
+    Title = "Fluent",
+    Content = "The script has been loaded.",
+    Duration = 8
+})
